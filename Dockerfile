@@ -1,7 +1,7 @@
 FROM debian:buster
 
 # Install gosu
-ENV GOSU_VERSION=1.11
+ENV GOSU_VERSION=1.14
 
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates wget gnupg2 gosu\
@@ -34,29 +34,32 @@ RUN bash -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main
 		postgresql-client-10 \
 		postgresql-client-11 \
 		postgresql-client-12 \
+		postgresql-client-13 \
 		python3 \
         python3-distutils \
 		rsync \
         gettext-base \
         procps \
+        nano \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& rm -f /etc/crontab /etc/cron.*/* \
 	&& sed -i 's/\(.*pam_loginuid.so\)/#\1/' /etc/pam.d/cron \
-    && mkdir -p /etc/barman/barman.d
+    && mkdir -p /etc/barman.d
 
 # Set up some defaults for file/directory locations used in entrypoint.sh.
 ENV \
-	BARMAN_VERSION=2.10 \
+	BARMAN_VERSION=2.13 \
 	BARMAN_CRON_SRC=/private/cron.d \
 	BARMAN_DATA_DIR=/var/lib/barman \
 	BARMAN_LOG_DIR=/var/log/barman \
 	BARMAN_SSH_KEY_DIR=/private/ssh \
 	BARMAN_PGPASSFILE=/private/pgpass \
     BARMAN_CRON_SCHEDULE="* * * * *" \
-    BARMAN_BACKUP_SCHEDULE="0 4 * * *" \
+    BARMAN_BACKUP_SCHEDULE="0 7 * * *" \
     BARMAN_LOG_LEVEL=INFO \
     DB_HOST=pg \
     DB_PORT=5432 \
+    DB_HOST_NAME=pg \
     DB_SUPERUSER=postgres \
     DB_SUPERUSER_PASSWORD=postgres \
     DB_SUPERUSER_DATABASE=postgres \
@@ -67,28 +70,30 @@ ENV \
     BARMAN_EXPORTER_SCHEDULE="*/5 * * * *" \
     BARMAN_EXPORTER_LISTEN_ADDRESS="0.0.0.0" \
     BARMAN_EXPORTER_LISTEN_PORT=9780 \
-    BARMAN_EXPORTER_CACHE_TIME=3600
+    BARMAN_EXPORTER_CACHE_TIME=3600 \
+    BARMAN_BANDWIDTH_LIMIT=0 \
+    BARMAN_RETENTION_POLICY="RECOVERY WINDOW OF 14 DAYS"
 VOLUME ${BARMAN_DATA_DIR}
 
 COPY install_barman.sh /tmp/
 RUN /tmp/install_barman.sh && rm /tmp/install_barman.sh
 COPY barman.conf.template /etc/barman.conf.template
-COPY pg.conf.template /etc/barman/barman.d/pg.conf.template
-COPY wal_archiver.py /usr/local/lib/python3.7/dist-packages/barman/wal_archiver.py
+COPY pg.conf.template /etc/barman.d/pg.conf.template
+#COPY wal_archiver.py /usr/local/lib/python3.7/dist-packages/barman/wal_archiver.py
 
 # Install barman exporter
 RUN pip install barman-exporter && mkdir /node_exporter
 VOLUME /node_exporter
 
-ENV TINI_VERSION v0.18.0
+ENV TINI_VERSION v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini.asc /tini.asc
-RUN gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
- && gpg --verify /tini.asc \
- && chmod +x /tini
-
+RUN gpg --batch --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
+ && gpg --batch --verify /tini.asc /tini
+RUN chmod +x /tini
 CMD ["cron", "-L", "4",  "-f"]
 COPY entrypoint.sh /
+COPY update_secure_files.sh /
 WORKDIR ${BARMAN_DATA_DIR}
 
 # Install the entrypoint script.  It will set up ssh-related things and then run

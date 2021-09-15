@@ -1,0 +1,9 @@
+# Created by .gitignore support plugin (hsz.mobi)
+### Vagrant template
+.vagrant/
+### IDEA files
+.idea
+### download temp
+tmp
+### Ansible init
+.ansible/
