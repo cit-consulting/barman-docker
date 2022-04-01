@@ -41,6 +41,7 @@ RUN bash -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ buster-pgdg main
         gettext-base \
         procps \
         nano \
+        screen \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& rm -f /etc/crontab /etc/cron.*/* \
 	&& sed -i 's/\(.*pam_loginuid.so\)/#\1/' /etc/pam.d/cron \
